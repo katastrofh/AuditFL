@@ -1,0 +1,2 @@
+backend,dataset,n_total,clients,rounds,final_test_acc,mean_included,mean_refunds,mean_unretrievable,mean_invalid,store_puts,store_gets,store_get_failures,tx_count,total_gas_used_model_or_estimate,claim_errors_expected_when_no_entitlement,plain_final_test_acc,accuracy_gap_vs_plain
+mock,mnist_784,70000,50,12,0.898,43.083333333333336,43.083333333333336,0.0,0.0,530,517,0,1109,107052000,0,0.8992,-0.0011999999999999789

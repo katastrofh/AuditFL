@@ -1,0 +1,2 @@
+backend,dataset,n_total,clients,rounds,final_test_acc,mean_included,mean_refunds,mean_unretrievable,mean_invalid,store_puts,store_gets,store_get_failures,tx_count,total_gas_used_model_or_estimate,claim_errors_expected_when_no_entitlement,plain_final_test_acc,accuracy_gap_vs_plain
+anvil,mnist_784,70000,75,12,0.8935428571428572,75.0,75.0,0.0,0.0,913,900,0,1901,301068479,0,0.8935428571428572,0.0
