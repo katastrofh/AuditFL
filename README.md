@@ -67,6 +67,33 @@ python3 -m scripts.run_contract_mvp \
 
 The smoke run was checked with Python 3.12.14, NumPy 2.3.5, pandas 2.2.3, and scikit-learn 1.8.0. It produced matching Plain FL and AuditFL accuracy trajectories, 99 mock receipts, 45 stored artifacts, and no failed artifact reads. These versions record the checked environment; the dependency files currently do not pin exact versions.
 
+## Automated checks
+
+The [Python CI workflow](https://github.com/katastrofh/AuditFL/actions/workflows/python-package-conda.yml)
+runs on pushes, pull requests, and manual dispatch using Python 3.12 and Ubuntu 24.04.
+It installs `requirements.txt`, checks Python syntax and undefined names, and runs
+pytest checks for artifact integrity, mock settlement and claims, aggregation, and
+the quickstart CLI. The clean smoke test checks matching accuracy trajectories,
+99 mock receipts, 45 artifact writes, and zero failed reads. Additional tests check
+dropout, malformed-update, and unavailable-artifact accounting.
+
+Run the same core checks locally after activating your Python environment:
+
+```bash
+python -m pip install -r requirements.txt pytest flake8
+python -m pip check
+python -m flake8 bcfl_contract scripts aggregate_results.py tests --count --select=E9,F63,F7,F82 --show-source --statistics
+python -m pytest tests -v
+```
+
+CI also installs `requirements-evm.txt` and checks that the EVM wrapper and its
+dependencies import. This is an installation check; it does not launch Anvil or
+validate Solidity execution. Core tests need no blockchain node or dataset download.
+Test reports, smoke outputs, and the resolved dependency versions are retained as
+workflow artifacts for seven days. Python 3.12 tracks patch updates; dependencies
+remain unpinned, so this workflow checks current dependency compatibility rather
+than reproducing the exact historical experiment environment.
+
 ## Reported results
 
 ### Clean scaling on full MNIST
