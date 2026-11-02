@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use AuditFL in your research, please cite the accompanying paper below."
+type: software
+title: AuditFL
+authors:
+  - family-names: Balla
+    given-names: Alexandros
+  - family-names: Lalis
+    given-names: Spyros
+repository-code: "https://github.com/katastrofh/AuditFL"
+url: "https://github.com/katastrofh/AuditFL"
+keywords:
+  - federated learning
+  - smart contracts
+  - coordination
+  - auditability
+  - reproducible research
+preferred-citation:
+  type: article
+  title: "AuditFL: A Contract-Backed Clearing Layer for Open Federated Learning"
+  authors:
+    - family-names: Balla
+      given-names: Alexandros
+    - family-names: Lalis
+      given-names: Spyros
+  journal: "arXiv preprint arXiv:2610.41278"
+  year: 2026
+  url: "https://arxiv.org/abs/2610.41278"
