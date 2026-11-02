@@ -1,315 +1,231 @@
-# AuditFL Anonymous Artifact
+# AuditFL
 
-This repository contains the anonymous review artifact for **AuditFL**, a contract-backed clearing layer for auditable federated learning (FL). AuditFL separates the FL learning path from the coordination path: model training and aggregation run off chain, while the ledger records ticket reservations, update identifiers, round finalization, refunds, rewards, claims, and other economic state.
+### Auditable coordination for open federated learning
 
-This artifact supports the paper's implementation and evaluation claims. It is intended for reproducibility and review, not for production deployment.
+[![arXiv](https://img.shields.io/badge/arXiv-2610.41278-b31b1b.svg)](https://arxiv.org/abs/2610.41278)
 
-## What this artifact demonstrates
+**[Paper](https://arxiv.org/abs/2610.41278) · [Quickstart](#quickstart) · [Results](#reported-results) · [Reproduction](#reproduce-the-experiments) · [Citation](#citation)**
 
-The artifact validates AuditFL as a **control-plane system**:
+AuditFL records participation and settlement on a ledger while model training and aggregation stay off chain. It combines deposit-backed update tickets, content-addressed model artifacts, and an explicit record of round finalization, refunds, rewards, and claims.
 
-- Clients reserve update tickets with deposits.
-- Clients train locally and place update artifacts in an off-chain content-addressed artifact store.
-- Clients publish only update identifiers on chain.
-- The Task Coordinator retrieves available updates, filters invalid artifacts, aggregates valid updates, writes the next global artifact, and finalizes the round.
-- The contract records listings, tickets, reward pools, update identifiers, global identifiers, refunds, rewards, claims, and entitlements.
-- Model tensors stay outside the contract execution path.
-- The Anvil/EVM backend reports transaction counts and EVM gas usage.
-- The deterministic state-machine backend supports controlled dropout, invalid-update, and artifact-unavailability stress tests.
+**Paper:** *AuditFL: A Contract-Backed Clearing Layer for Open Federated Learning*  
+**Authors:** Alexandros Balla and Spyros Lalis
 
-The evaluation treats AuditFL as a clearing/control-plane layer, not as a new FL optimizer.
+## How it works
 
-## Scope
-
-This is a research artifact for double-blind review. It is **not**:
-
-- an audited production smart-contract system,
-- a public mainnet or testnet deployment,
-- a complete staking/slashing protocol,
-- a privacy-preserving FL stack,
-- a Byzantine-robust FL optimizer,
-- a wide-area storage system,
-- or an IPFS deployment.
-
-AuditFL assumes a reliable distributed off-chain artifact layer. The evaluated artifact uses a local SHA-256 content-addressed artifact store. Systems such as IPFS are compatible deployment substrates, but the reported experiments do not run IPFS.
-
-## Execution backends
-
-The artifact contains two execution backends.
-
-1. **State-machine backend**
-
-   A deterministic Python implementation of the ticket, refund, scoring, and round-finalization rules. It is used for fast debugging and controlled failure-stress sweeps.
-
-2. **Anvil/EVM backend**
-
-   A Solidity `BCFLCoordinator` contract deployed on a local Ethereum-compatible Anvil chain. It is used to collect transaction receipts and EVM gas measurements.
-
-Both backends use the same Python client and Task Coordinator logic and the same local SHA-256 content-addressed artifact store.
-
-## Paper experiment summary
-
-The paper evaluates AuditFL on full MNIST loaded through OpenML.
-
-Main clean-scaling configuration:
-
-| Item | Value |
-|---|---:|
-| Dataset | Full MNIST via OpenML |
-| Examples | 70,000 |
-| Rounds | 12 |
-| Client counts | 1, 2, 5, 10, 15, 20, 30, 40, 50, 75, 100, 150, 200 |
-| Split | Non-IID Dirichlet, alpha = 0.4 for N > 1 |
-| Baseline | Plain FL with the same model, split, local training rule, and aggregation rule |
-| Contract backend | Solidity `BCFLCoordinator` on local Anvil |
-| Artifact store | Local SHA-256 content-addressed store |
-
-At N = 200, the contract-backed run reports:
-
-| Metric | Value |
-|---|---:|
-| Transactions, including deployment | 5,026 |
-| Off-chain artifacts | 2,413 |
-| Off-chain artifact bytes | 144.9 MiB |
-| EVM gas | 829.7M |
-| Dominant calls | `reserveTicket`, `publishUpdate` |
-| Plain FL / AuditFL accuracy gap | 0 in clean runs |
-
-Controlled failure-stress configuration:
-
-| Item | Value |
-|---|---:|
-| Dataset | Full MNIST |
-| Clients | 50 |
-| Rounds | 12 |
-| Seeds | 3 |
-| Failure rates | 0% to 50% |
-| Failure types | dropout, invalid update, artifact unavailability |
-| Backend | deterministic state-machine backend |
-
-At 50% injected failure, rounds still finalize and the final-accuracy gap remains below 0.14 percentage points in the reported stress runs.
-
-## Repository layout
-
-```text
-contracts/BCFLCoordinator.sol      Solidity clearing-layer contract
-bcfl_contract/store.py             SHA-256 content-addressed artifact store
-bcfl_contract/fl.py                Dataset loading, non-IID split, local training, aggregation
-bcfl_contract/mock_chain.py        Deterministic Python state-machine backend
-bcfl_contract/evm_chain.py         Anvil/EVM Solidity backend
-bcfl_contract/experiment.py        End-to-end experiment runner
-scripts/run_contract_mvp.py        Main Plain FL vs AuditFL runner
-scripts/run_failure_sweep.py       Controlled failure-stress sweeps
-scripts/plot_results.py            Plotting and gas-summary utilities
-requirements.txt                   Core Python dependencies
-requirements-evm.txt               EVM/web3/Solidity dependencies
+```mermaid
+flowchart TD
+    C["Clients"] -->|"Store local updates"| S["Off-chain artifact store"]
+    C -->|"Reserve tickets and publish identifiers"| L["Clearing layer"]
+    L -->|"Read round and ticket state"| T["Task Coordinator"]
+    S -->|"Retrieve updates"| T
+    T -->|"Store next global model"| S
+    S -->|"Retrieve global model"| C
+    T -->|"Finalize round and record settlement"| L
 ```
 
-Some internal code names may use older implementation terms. In the paper and this README, the FL-side aggregator role is called the **Task Coordinator**.
+The Task Coordinator retrieves artifacts, checks their integrity and shape, aggregates included updates, and finalizes each round. The clearing layer records identifiers and economic state; model tensors remain in the off-chain store.
 
-## Environment
+| Backend | Purpose |
+|---|---|
+| **Python state machine** | Fast local execution and controlled failure experiments |
+| **Solidity on Anvil** | Local EVM execution, transaction receipts, and measured gas usage |
 
-The artifact was tested on a recent Linux environment with Python 3 and Foundry/Anvil. Other recent Linux distributions should also work.
+Both backends share the Python training and coordination code and a local SHA-256 content-addressed artifact store.
 
-Create and activate a Python environment:
+## Quickstart
+
+Run a clean comparison with **10 clients and four rounds** using the built-in scikit-learn digits dataset. After dependencies are installed, this run needs no blockchain node or dataset download.
+
+From a Bash-compatible shell:
 
 ```bash
+git clone https://github.com/katastrofh/AuditFL.git
+cd AuditFL
 python3 -m venv .venv
 source .venv/bin/activate
-python3 -m pip install --upgrade pip
 python3 -m pip install -r requirements.txt
+
+python3 -m scripts.run_contract_mvp \
+  --backend mock \
+  --dataset digits \
+  --clients 10 \
+  --quick \
+  --seed 7 \
+  --out results_mock_quick
 ```
 
-For Anvil/EVM experiments, also install:
+`--quick` sets the round count to four. The output directory contains:
+
+| File | Contents |
+|---|---|
+| `plain_fl_rounds.csv` | Plain FL accuracy by round |
+| `bcfl_mock_rounds.csv` | AuditFL accuracy, inclusion, and fault counters by round |
+| `contract_mock_receipts.csv` | State-machine operations and modeled gas estimates |
+| `contract_mvp_summary.csv` | Run configuration and final metrics |
+| `paper_ready_notes.md` | Human-readable run summary |
+
+The smoke run was checked with Python 3.12.14, NumPy 2.3.5, pandas 2.2.3, and scikit-learn 1.8.0. It produced matching Plain FL and AuditFL accuracy trajectories, 99 mock receipts, 45 stored artifacts, and no failed artifact reads. These versions record the checked environment; the dependency files currently do not pin exact versions.
+
+## Reported results
+
+### Clean scaling on full MNIST
+
+The archived scaling experiments use **70,000 MNIST examples, 12 rounds, and 1–200 clients**, with a non-IID Dirichlet split (`alpha = 0.4` for multiple clients). The Solidity contract runs on a local Anvil chain.
+
+At **200 clients**:
+
+| Transactions, including deployment | Off-chain artifacts | Artifact volume | Total EVM gas |
+|---:|---:|---:|---:|
+| **5,026** | **2,413** | **144.9 MiB** | **829.7 million** |
+
+The archived clean runs have zero final-accuracy gap between Plain FL and AuditFL. Both use the same model, data split, local training, and aggregation procedure; AuditFL changes the coordination and settlement path.
+
+![Measured transaction counts, EVM gas, operation breakdown, and gas per client-round across 1–200 clients.](paper_figures/fig_control_plane_scaling_v2.png)
+
+**Inspect the evidence:** [scaling summary CSV](Results/auditfl_scaling_full_mnist_summary_N1_to_N200.csv) · [gas by operation CSV](Results/auditfl_scaling_full_mnist_gas_by_operation_N1_to_N200.csv) · [storage scaling figure](paper_figures/fig_storage_scaling_v2.png)
+
+### Controlled failure experiments
+
+The state-machine experiments use **50 clients, 12 rounds, and three seeds**, injecting dropout, malformed updates, or unavailable artifacts separately at rates from 0% to 50%.
+
+At **50% injected failure**, the mean final-accuracy decrease relative to Plain FL is approximately **0.080 percentage points for dropout, 0.124 for malformed updates, and 0.133 for unavailable artifacts**. These are means across three seeds for that failure rate, under the implemented fault model.
+
+![Accuracy differences, included updates, and fault accounting in the controlled failure experiments.](paper_figures/fig_failure_stress_compact.png)
+
+**Inspect the evidence:** [aggregate CSV](Results/auditfl_failure_sweep_mnist_full_N50_aggregate.csv) · [individual-run CSV](Results/auditfl_failure_sweep_mnist_full_N50_all_runs.csv)
+
+## Reproduce the experiments
+
+Start with the quickstart above. The commands below run from the repository root with the Python environment activated, except where a subshell explicitly changes directories.
+
+<details>
+<summary><strong>Render the paper figures from archived CSVs</strong></summary>
+
+This regenerates plots from the checked-in data without rerunning training:
+
+```bash
+(
+  cd Results
+  MPLBACKEND=Agg python3 ../scripts/plot_scaling_paper_figures_v2.py
+  MPLBACKEND=Agg python3 ../scripts/plot_failure_paper_figures.py
+)
+```
+
+The scripts read CSVs from their current working directory and write PNG/PDF figures to `Results/paper_figures/` in this example. The figures displayed above are the existing copies in the repository's top-level `paper_figures/` directory.
+
+</details>
+
+<details>
+<summary><strong>Run the 200-client, full-MNIST Anvil configuration</strong></summary>
+
+Install [Foundry/Anvil](https://getfoundry.sh/introduction/installation/) and the EVM dependencies:
 
 ```bash
 python3 -m pip install -r requirements-evm.txt
 ```
 
-Install Foundry/Anvil if needed:
+Start Anvil in one terminal with at least one account per client plus one for the Task Coordinator:
 
 ```bash
-curl -L https://foundry.paradigm.xyz | bash
-source ~/.bashrc
-foundryup
-anvil --version
+anvil --host 127.0.0.1 --port 8545 --accounts 201 --silent
 ```
 
-## Quick smoke test: state-machine backend
-
-This checks that the Python backend, dataset pipeline, local artifact store, and experiment runner work.
+In another terminal, from the repository root with the Python environment activated:
 
 ```bash
-source .venv/bin/activate
-python3 scripts/run_contract_mvp.py --quick --out results_mock_quick
-```
-
-Expected outputs include CSV summaries and run notes, for example:
-
-```text
-results_mock_quick/plain_fl_rounds.csv
-results_mock_quick/bcfl_mock_rounds.csv
-results_mock_quick/contract_mock_receipts.csv
-results_mock_quick/contract_mvp_summary.csv
-results_mock_quick/paper_ready_notes.md
-```
-
-## Quick smoke test: Anvil/EVM backend
-
-Start Anvil in one terminal:
-
-```bash
-anvil --host 127.0.0.1 --port 8545 --accounts 20 --silent
-```
-
-In a second terminal:
-
-```bash
-cd <repo-root>
-source .venv/bin/activate
-python3 -m pip install -r requirements.txt -r requirements-evm.txt
-python3 scripts/run_contract_mvp.py --backend anvil --quick --out results_anvil_quick
-```
-
-The first Anvil run may download Solidity compiler 0.8.24 through `py-solc-x`.
-
-## Controlled failure sweeps
-
-The deterministic state-machine backend is used for controlled stress tests because these tests concern ticket inclusion, update validity, and artifact availability rather than EVM execution cost.
-
-```bash
-source .venv/bin/activate
-python3 scripts/run_failure_sweep.py --out results_failure_sweep
-python3 scripts/plot_results.py results_failure_sweep
-```
-
-The sweep output contains CSV summaries and plots under the output directory.
-
-## Full MNIST run
-
-Use OpenML MNIST with all 70,000 examples by setting `--max-samples 0` if supported by the runner.
-
-Example Anvil command for a single full-MNIST run:
-
-```bash
-anvil --host 127.0.0.1 --port 8545 --accounts 250 --silent
-```
-
-In another terminal:
-
-```bash
-source .venv/bin/activate
-python3 scripts/run_contract_mvp.py \
+python3 -m scripts.run_contract_mvp \
   --backend anvil \
   --dataset mnist \
   --max-samples 0 \
+  --clients 200 \
   --rounds 12 \
-  --out results_anvil_mnist_full_12r
+  --seed 7 \
+  --out results_anvil_mnist_full_N200_12r
 ```
 
-For large client counts, start Anvil with enough unlocked accounts for the Task Coordinator and all clients. For example, use at least N + 1 accounts.
+`--max-samples 0` selects the full dataset. MNIST is downloaded through OpenML on first use. The EVM wrapper may also download Solidity compiler 0.8.24 on first use; it compiles with optimization and `viaIR` enabled.
 
-Generate summaries and plots:
+For the full clean-scaling grid, repeat with `--clients` set to `1, 2, 5, 10, 15, 20, 30, 40, 50, 75, 100, 150, 200`, using a matching `results_anvil_mnist_full_N<clients>_12r` output directory for each run. With all those directories in the repository root, collect and plot them using:
 
 ```bash
-python3 scripts/plot_results.py results_anvil_mnist_full_12r
+python3 aggregate_results.py
+MPLBACKEND=Agg python3 -m scripts.plot_scaling_paper_figures_v2
 ```
 
-## Paper figures
+The final plotting command writes to the top-level `paper_figures/` directory. For a smaller EVM smoke run, use `--clients 10 --dataset digits --quick` with a separate output directory.
 
-The paper figures are generated from the paper-result CSVs and plotting scripts.
+</details>
 
-Typical usage:
+<details>
+<summary><strong>Run the full 50-client failure grid</strong></summary>
+
+This launches **90 runs**: three seeds × ten rates × three failure types. It uses the current state-machine implementation and the directory names expected by the result collector.
 
 ```bash
-source .venv/bin/activate
-python3 scripts/plot_results.py <results-directory>
+bash <<'BASH'
+set -euo pipefail
+
+for seed in 1 2 3; do
+  for rate in 0.00 0.10 0.15 0.20 0.25 0.30 0.35 0.40 0.45 0.50; do
+    label="${rate/./p}"
+    for failure in storage dropout invalid; do
+      case "$failure" in
+        storage) flag="--storage-fail-rate" ;;
+        dropout) flag="--dropout-rate" ;;
+        invalid) flag="--invalid-rate" ;;
+      esac
+      out="results_mock_mnist_full_N50_R12_seed${seed}_${failure}_${label}"
+      python3 -m scripts.run_contract_mvp \
+        --backend mock --dataset mnist --max-samples 0 \
+        --clients 50 --rounds 12 --seed "$seed" \
+        "$flag" "$rate" --out "$out"
+    done
+  done
+done
+
+python3 -m scripts.collect_custom_failure_sweep
+MPLBACKEND=Agg python3 -m scripts.plot_failure_paper_figures
+BASH
 ```
 
-The plotting script produces control-plane, artifact-scaling, gas-breakdown, and failure-stress plots when the required CSV files are present.
+The collector writes `auditfl_failure_sweep_mnist_full_N50_all_runs.csv` and `auditfl_failure_sweep_mnist_full_N50_aggregate.csv` in the repository root. The plotting command writes to the top-level `paper_figures/` directory.
 
-The paper reports:
+</details>
 
-- control-plane transaction scaling,
-- EVM gas scaling and gas breakdown,
-- artifact count and artifact-byte scaling,
-- identifier bytes versus artifact bytes,
-- artifact bytes per client-round,
-- and controlled failure-stress behavior.
+## Scope and implementation assumptions
 
-## Reproducing the paper claims
+AuditFL is a research artifact for studying coordination and settlement. The Task Coordinator performs aggregation, artifact validation, and scoring; these computations are not verified by the contract. The current evaluation uses local Anvil execution and a local artifact store, so it does not measure public-network throughput or wide-area storage behavior.
 
-The paper uses two classes of runs:
+The fault model has specific semantics: dropout occurs before ticket reservation; malformed updates can be retrieved but are excluded from aggregation; unavailable artifacts cannot be retrieved. In the current runner, retrievable artifacts are placed on the refund list before shape validation. These experiments characterize that implementation and do not establish general Byzantine robustness, privacy, or a complete slashing protocol.
 
-1. **Clean scaling runs**
+## Repository map
 
-   These use the Anvil/EVM backend and measure transaction receipts, gas usage, artifact counts, and clean Plain FL versus AuditFL learning behavior.
+| Path | Purpose |
+|---|---|
+| [`contracts/BCFLCoordinator.sol`](contracts/BCFLCoordinator.sol) | Solidity clearing contract |
+| [`bcfl_contract/experiment.py`](bcfl_contract/experiment.py) | Shared experiment and coordination logic |
+| [`bcfl_contract/fl.py`](bcfl_contract/fl.py) | Data loading, splitting, training, and aggregation |
+| [`bcfl_contract/store.py`](bcfl_contract/store.py) | SHA-256 content-addressed artifact store |
+| [`bcfl_contract/mock_chain.py`](bcfl_contract/mock_chain.py) | Python state-machine backend |
+| [`bcfl_contract/evm_chain.py`](bcfl_contract/evm_chain.py) | Anvil/EVM backend |
+| [`scripts/`](scripts/) | Experiment runners, collectors, and plotting scripts |
+| [`Results/`](Results/) | Archived experiment outputs and aggregate data |
+| [`paper_figures/`](paper_figures/) | Paper figures in PNG and PDF formats |
 
-2. **Failure-stress runs**
+## Citation
 
-   These use the deterministic state-machine backend and inject dropout, invalid updates, and artifact unavailability.
+If AuditFL informs your research, please cite the accompanying paper:
 
-The clean setting is expected to produce the same learning trajectory as Plain FL because AuditFL changes only coordination, publication, finalization, and settlement. It does not change the model, local training rule, aggregation rule, or data split.
-
-## Artifact-store note
-
-The evaluated artifact store is local and content-addressed:
-
-- artifacts are addressed by SHA-256-derived identifiers,
-- fetched bytes are rehashed before use,
-- tensors are never stored on chain,
-- and the chain records only identifiers and economic state.
-
-The artifact store is not a contribution of this repository. It is a local implementation of the off-chain artifact interface assumed by AuditFL.
-
-## Troubleshooting
-
-### `anvil: command not found`
-
-Install Foundry:
-
-```bash
-curl -L https://foundry.paradigm.xyz | bash
-source ~/.bashrc
-foundryup
+```bibtex
+@misc{balla2026auditfl,
+  title         = {{AuditFL}: A Contract-Backed Clearing Layer for Open Federated Learning},
+  author        = {Alexandros Balla and Spyros Lalis},
+  year          = {2026},
+  eprint        = {2610.41278},
+  archivePrefix = {arXiv},
+  url           = {https://arxiv.org/abs/2610.41278}
+}
 ```
 
-### Not enough unlocked Anvil accounts
-
-Restart Anvil with more accounts:
-
-```bash
-anvil --host 127.0.0.1 --port 8545 --accounts 250 --silent
-```
-
-For a run with N clients, use at least N + 1 accounts.
-
-### Solidity compilation downloads compiler on first run
-
-The Anvil backend may use `py-solc-x` to install Solidity compiler 0.8.24 on the first run. This requires internet access once.
-
-### `Stack too deep` during Solidity compilation
-
-The EVM backend should compile with optimizer and `viaIR: true`. Check the compiler settings in `bcfl_contract/evm_chain.py` if this error appears.
-
-Expected compiler settings include:
-
-```python
-"optimizer": {"enabled": True, "runs": 200},
-"viaIR": True,
-```
-
-### `ModuleNotFoundError`
-
-Activate the virtual environment and reinstall dependencies:
-
-```bash
-source .venv/bin/activate
-python3 -m pip install -r requirements.txt -r requirements-evm.txt
-```
-
-### OpenML dataset download fails
-
-Check internet access and retry. For a quick offline sanity check, run the quick state-machine smoke test if it uses a local or built-in dataset path.
-
-
+Machine-readable citation metadata is provided in [`CITATION.cff`](CITATION.cff).
