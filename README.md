@@ -4,12 +4,18 @@
 
 [![arXiv](https://img.shields.io/badge/arXiv-2610.41278-b31b1b.svg)](https://arxiv.org/abs/2610.41278)
 
-**[Paper](https://arxiv.org/abs/2610.41278) · [Quickstart](#quickstart) · [Results](#reported-results) · [Reproduction](#reproduce-the-experiments) · [Citation](#citation)**
+**[Paper](https://arxiv.org/abs/2610.41278) · [Slides](docs/AuditFL_FLTA2026_slides.pdf) · [Quickstart](#quickstart) · [Results](#reported-results) · [Reproduction](#reproduce-the-experiments) · [Citation](#citation)**
 
 AuditFL records participation and settlement on a ledger while model training and aggregation stay off chain. It combines deposit-backed update tickets, content-addressed model artifacts, and an explicit record of round finalization, refunds, rewards, and claims.
 
 **Paper:** *AuditFL: A Contract-Backed Clearing Layer for Open Federated Learning*  
 **Authors:** Alexandros Balla and Spyros Lalis
+
+## Conference presentation
+
+[**IEEE FLTA 2026 presentation slides (PDF, 20 slides)**](docs/AuditFL_FLTA2026_slides.pdf)
+
+Presented by Alexandros Balla, with co-author Spyros Lalis. The deck covers the participant problem, protocol workflow, evaluated prototype, and experimental results. Slides 1–13 contain the main talk; slides 14–20 provide technical Q&A and implementation details.
 
 ## How it works
 
@@ -239,6 +245,7 @@ The fault model has specific semantics: dropout occurs before ticket reservation
 | [`scripts/`](scripts/) | Experiment runners, collectors, and plotting scripts |
 | [`Results/`](Results/) | Archived experiment outputs and aggregate data |
 | [`paper_figures/`](paper_figures/) | Paper figures in PNG and PDF formats |
+| [`docs/AuditFL_FLTA2026_slides.pdf`](docs/AuditFL_FLTA2026_slides.pdf) | IEEE FLTA 2026 presentation and technical Q&A |
 
 ## Citation
 
